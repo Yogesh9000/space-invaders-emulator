@@ -27,6 +27,7 @@ public:
   bool parity_iseven(uint16_t n);
 
   void cycle();
+  void generate_interrupt(uint8_t int_num);
 
   // OPCODES
   void op_nop();
@@ -44,7 +45,9 @@ public:
   void op_xchg();
 
   // Arithmetic Group
+  void op_inr();
   void op_inx();
+  void op_dcx();
   void op_dcr();
   void op_dad();
   void op_ani();
@@ -54,19 +57,24 @@ public:
   void op_jmp();
   void op_jmp_ccc();
   void op_call();
+  void op_call_ccc();
   void op_ret();
+  void op_pchl();
 
   // Logical Group
   void op_cpi();
   void op_rrc();
   void op_xra();
   void op_ana();
+  void op_r_ccc();
+  void op_ora();
 
   // Stack, I/O, Machine Group
   void op_push();
   void op_pop();
   void op_out();
   void op_ei();
+  void op_xthl();
 
 private:
   uint8_t a{};
@@ -79,6 +87,7 @@ private:
   ConditionalCodes cc{};
   uint16_t pc{};
   uint16_t sp{};
+  bool int_enable{false};
   Memory& memory;
   std::unique_ptr<func[]> table{};
 };

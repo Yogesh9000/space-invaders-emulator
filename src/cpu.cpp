@@ -15,35 +15,47 @@ Cpu::Cpu(Memory& memory)
   table[0x00] = &Cpu::op_nop;
   table[0x01] = &Cpu::op_lxi;
   table[0x03] = &Cpu::op_inx;
+  table[0x04] = &Cpu::op_inr;
   table[0x05] = &Cpu::op_dcr;
   table[0x06] = &Cpu::op_mvi;
   table[0x09] = &Cpu::op_dad;
   table[0x0a] = &Cpu::op_ldax;
+  table[0x0b] = &Cpu::op_dcx;
+  table[0x0c] = &Cpu::op_inr;
   table[0x0d] = &Cpu::op_dcr;
   table[0x0e] = &Cpu::op_mvi;
   table[0x0f] = &Cpu::op_rrc;
   table[0x11] = &Cpu::op_lxi;
   table[0x13] = &Cpu::op_inx;
+  table[0x14] = &Cpu::op_inr;
   table[0x15] = &Cpu::op_dcr;
   table[0x16] = &Cpu::op_mvi;
   table[0x19] = &Cpu::op_dad;
+  table[0x1a] = &Cpu::op_ldax;
+  table[0x1b] = &Cpu::op_dcx;
+  table[0x1c] = &Cpu::op_inr;
   table[0x1d] = &Cpu::op_dcr;
   table[0x1e] = &Cpu::op_mvi;
-  table[0x1a] = &Cpu::op_ldax;
   table[0x21] = &Cpu::op_lxi;
   table[0x23] = &Cpu::op_inx;
+  table[0x24] = &Cpu::op_inr;
   table[0x25] = &Cpu::op_dcr;
   table[0x26] = &Cpu::op_mvi;
   table[0x29] = &Cpu::op_dad;
+  table[0x2b] = &Cpu::op_dcx;
+  table[0x2c] = &Cpu::op_inr;
   table[0x2d] = &Cpu::op_dcr;
   table[0x2e] = &Cpu::op_mvi;
   table[0x31] = &Cpu::op_lxi;
   table[0x32] = &Cpu::op_sta;
   table[0x33] = &Cpu::op_inx;
+  table[0x34] = &Cpu::op_inr;
   table[0x35] = &Cpu::op_dcr;
   table[0x36] = &Cpu::op_mvi;
   table[0x39] = &Cpu::op_dad;
   table[0x3a] = &Cpu::op_lda;
+  table[0x3b] = &Cpu::op_dcx;
+  table[0x3c] = &Cpu::op_inr;
   table[0x3d] = &Cpu::op_dcr;
   table[0x3e] = &Cpu::op_mvi;
   table[0x40] = &Cpu::op_mov;
@@ -125,30 +137,56 @@ Cpu::Cpu(Memory& memory)
   table[0xad] = &Cpu::op_xra;
   table[0xae] = &Cpu::op_xra;
   table[0xaf] = &Cpu::op_xra;
+  table[0xb0] = &Cpu::op_ora;
+  table[0xb1] = &Cpu::op_ora;
+  table[0xb2] = &Cpu::op_ora;
+  table[0xb3] = &Cpu::op_ora;
+  table[0xb4] = &Cpu::op_ora;
+  table[0xb5] = &Cpu::op_ora;
+  table[0xb6] = &Cpu::op_ora;
+  table[0xb7] = &Cpu::op_ora;
+  table[0xc0] = &Cpu::op_r_ccc;
   table[0xc1] = &Cpu::op_pop;
   table[0xc2] = &Cpu::op_jmp_ccc;
   table[0xc3] = &Cpu::op_jmp;
+  table[0xc4] = &Cpu::op_call_ccc;
   table[0xc5] = &Cpu::op_push;
   table[0xc6] = &Cpu::op_adi;
+  table[0xc8] = &Cpu::op_r_ccc;
   table[0xc9] = &Cpu::op_ret;
   table[0xca] = &Cpu::op_jmp_ccc;
+  table[0xcc] = &Cpu::op_call_ccc;
   table[0xcd] = &Cpu::op_call;
+  table[0xd0] = &Cpu::op_r_ccc;
   table[0xd1] = &Cpu::op_pop;
   table[0xd2] = &Cpu::op_jmp_ccc;
   table[0xd3] = &Cpu::op_out;
+  table[0xd4] = &Cpu::op_call_ccc;
   table[0xd5] = &Cpu::op_push;
+  table[0xd8] = &Cpu::op_r_ccc;
   table[0xda] = &Cpu::op_jmp_ccc;
+  table[0xdc] = &Cpu::op_call_ccc;
+  table[0xe0] = &Cpu::op_r_ccc;
   table[0xe1] = &Cpu::op_pop;
   table[0xe2] = &Cpu::op_jmp_ccc;
+  table[0xe3] = &Cpu::op_xthl;
+  table[0xe4] = &Cpu::op_call_ccc;
   table[0xe5] = &Cpu::op_push;
   table[0xe6] = &Cpu::op_ani;
+  table[0xe8] = &Cpu::op_r_ccc;
+  table[0xe9] = &Cpu::op_pchl;
   table[0xea] = &Cpu::op_jmp_ccc;
   table[0xeb] = &Cpu::op_xchg;
+  table[0xec] = &Cpu::op_call_ccc;
+  table[0xf0] = &Cpu::op_r_ccc;
   table[0xf1] = &Cpu::op_pop;
   table[0xf2] = &Cpu::op_jmp_ccc;
+  table[0xf4] = &Cpu::op_call_ccc;
   table[0xf5] = &Cpu::op_push;
+  table[0xf8] = &Cpu::op_r_ccc;
   table[0xfa] = &Cpu::op_jmp_ccc;
   table[0xfb] = &Cpu::op_ei;
+  table[0xfc] = &Cpu::op_call_ccc;
   table[0xfe] = &Cpu::op_cpi;
 }
 
@@ -162,6 +200,7 @@ void Cpu::print_debug() {
 }
 
 void Cpu::unimplemented_instruction() {
+  print_debug();
   fmt::println("{:x}: instruction is unimplemented", green(memory[pc]));
   std::exit(EXIT_FAILURE);
 }
@@ -884,7 +923,7 @@ void Cpu::op_xra() {
 
 void Cpu::op_ei() {
   pc += 1;
-  // TODO
+  int_enable = true;
 }
 
 void Cpu::op_ana() {
@@ -948,6 +987,306 @@ void Cpu::op_ana() {
       cc.s = (a & 0x80) >> 7;
       cc.p = parity_iseven(a);
       cc.cy = 0;
+      break;
+  }
+}
+
+void Cpu::generate_interrupt(uint8_t int_num) {
+  if (!int_enable) return;
+  uint16_t old_pc = pc;
+  pc += 1;
+  memory[sp - 1] = (pc & 0xff00) >> 8;
+  memory[sp - 2] = pc & 0xff;
+  sp -= 2;
+  pc = 8 * ((int_num & 0b00111000) >> 3);
+}
+
+void Cpu::op_r_ccc() {
+  uint16_t old_pc = pc;
+  pc += 1;
+  uint8_t ccc = memory.read_d8(old_pc);
+  ccc &= 0b00111000;
+  ccc >>= 3;
+  switch (ccc) {
+    case 0:
+      if (cc.z == 0) {
+        op_ret();
+      }
+      break;
+    case 1:
+      if (cc.z == 1) {
+        op_ret();
+      }
+      break;
+    case 2:
+      if (cc.cy == 0) {
+        op_ret();
+      }
+      break;
+    case 3:
+      if (cc.cy == 1) {
+        op_ret();
+      }
+      break;
+    case 4:
+      if (cc.p == 0) {
+        op_ret();
+      }
+      break;
+    case 5:
+      if (cc.p == 1) {
+        op_ret();
+      }
+      break;
+    case 6:
+      if (cc.s == 0) {
+        op_ret();
+      }
+      break;
+    case 7:
+      if (cc.s == 1) {
+        op_ret();
+      }
+      break;
+  }
+}
+
+void Cpu::op_ora() {
+  uint16_t old_pc = pc;
+  pc += 1;
+  uint8_t r = memory.read_d8(old_pc);
+  r &= 0b00000111;
+  switch (r) {
+    case 0:
+      a = a or b;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 1:
+      a = a or c;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 2:
+      a = a or d;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 3:
+      a = a or e;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 4:
+      a = a or h;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 5:
+      a = a or l;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 6:
+      a = a or memory.read_d8((h << 8) | l);
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+    case 7:
+      a = a or a;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      cc.cy = 0;
+      break;
+  }
+}
+
+void Cpu::op_xthl() {
+  pc += 1;
+  std::swap(l, memory[sp]);
+  std::swap(h, memory[sp + 1]);
+}
+
+void Cpu::op_pchl() {
+  pc += 1;
+  pc = (h << 8) | l;
+}
+
+void Cpu::op_dcx() {
+  uint16_t old_pc = pc;
+  pc += 1;
+  uint8_t rp = memory.read_d8(old_pc);
+  rp &= 0b00110000;
+  rp >>= 4;
+  uint16_t tmp;
+  switch (rp) {
+    case 0:
+      tmp = (b << 8) | c;
+      --tmp;
+      b = (tmp & 0xff00) >> 8;
+      c = tmp & 0xff;
+      break;
+    case 1:
+      tmp = (d << 8) | e;
+      --tmp;
+      d = (tmp & 0xff00) >> 8;
+      e = tmp & 0xff;
+      break;
+    case 2:
+      tmp = (h << 8) | l;
+      --tmp;
+      h = (tmp & 0xff00) >> 8;
+      l = tmp & 0xff;
+      break;
+    case 3:
+      --sp;
+      break;
+  }
+}
+
+void Cpu::op_inr() {
+  uint16_t old_pc = pc;
+  pc += 1;
+  uint8_t r = memory.read_d8(old_pc);
+  r &= 0b00111000;
+  r >>= 3;
+  switch (r) {
+    case 0:
+      ++b;
+      cc.z = (b == 0);
+      cc.s = (b & 0x80) >> 7;
+      cc.p = parity_iseven(b);
+      break;
+    case 1:
+      ++c;
+      cc.z = (c == 0);
+      cc.s = (c & 0x80) >> 7;
+      cc.p = parity_iseven(c);
+      break;
+    case 2:
+      ++d;
+      cc.z = (d == 0);
+      cc.s = (d & 0x80) >> 7;
+      cc.p = parity_iseven(d);
+      break;
+    case 3:
+      ++e;
+      cc.z = (e == 0);
+      cc.s = (e & 0x80) >> 7;
+      cc.p = parity_iseven(e);
+      break;
+    case 4:
+      ++h;
+      cc.z = (h == 0);
+      cc.s = (h & 0x80) >> 7;
+      cc.p = parity_iseven(h);
+      break;
+    case 5:
+      ++l;
+      cc.z = (l == 0);
+      cc.s = (l & 0x80) >> 7;
+      cc.p = parity_iseven(l);
+      break;
+    case 6:
+      memory[(h << 8) | l] = memory.read_d8((h << 8) | l) + 1;
+      cc.z = (memory[(h << 8) | l] == 0);
+      cc.s = (memory[(h << 8) | l] & 0x80) >> 7;
+      cc.p = parity_iseven(memory[(h << 8) | l]);
+      break;
+    case 7:
+      ++a;
+      cc.z = (a == 0);
+      cc.s = (a & 0x80) >> 7;
+      cc.p = parity_iseven(a);
+      break;
+  }
+}
+
+void Cpu::op_call_ccc() {
+  uint16_t old_pc = pc;
+  pc += 3;
+  uint8_t ccc = memory.read_d8(old_pc);
+  ccc &= 0b00111000;
+  ccc >>= 3;
+  switch (ccc) {
+    case 0:
+      if (cc.z == 0) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 1:
+      if (cc.z == 1) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 2:
+      if (cc.cy == 0) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 3:
+      if (cc.cy == 1) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 4:
+      if (cc.p == 0) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 5:
+      if (cc.p == 1) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 6:
+      if (cc.s == 0) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
+      break;
+    case 7:
+      if (cc.s == 1) {
+        memory[sp - 1] = (pc & 0xff00) >> 8;
+        memory[sp] = pc & 0xff;
+        sp -= 2;
+        pc = memory.read_d16_32(old_pc + 1);
+      }
       break;
   }
 }
