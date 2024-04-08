@@ -28,6 +28,7 @@ public:
 
   void cycle();
   void generate_interrupt(uint8_t int_num);
+  uint8_t get_cycles();
 
   // OPCODES
   void op_nop();
@@ -105,6 +106,7 @@ private:
   ConditionalCodes cc{};
   uint16_t pc{};
   uint16_t sp{};
+  uint8_t cycles_{};
   bool int_enable{false};
   Memory& memory;
   std::unique_ptr<func[]> table{};
