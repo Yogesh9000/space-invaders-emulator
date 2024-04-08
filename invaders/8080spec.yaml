@@ -1,0 +1,30 @@
+8080:
+  - Registers:
+      Quantity: 8
+      Names: ['A', 'B', 'C', 'D', 'E', 'H', 'L', 'F'] #some operations refer registers in pair, B: B and C, D: D and E, H:H and L
+                                                      # PSW: A and F(Flag) Register
+      Size: '8bits'
+  - Memory:
+      Size: '64kb' #(65536 bytes)
+      AddressebleMemorySize: '8bits' # byte addresseble
+      MemoryMap:
+        ROM:
+          invaders_h: start:0000 end:07ff
+          invaders_g: start:0800 end:0fff
+          invaders_f: start:1000 end:17ff
+          invaders_e: start:1800 end:1fff
+        RAM:
+          work_ram: start:2000 end:23ff
+          video_ram: start:2400 end:3fff
+        RAMMIRROR:
+          start: 4000
+          end: ffff
+      Hardware:
+        Display:
+          width: 256
+          height: 224
+  - ProgramCounter:
+      Size: '16bits'
+  - StackPointer:
+      Size: '16bits'
+  - Input/Output:
