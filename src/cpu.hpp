@@ -38,11 +38,12 @@ public:
   void op_lxi();
   void op_lda();
   void op_sta();
-  void op_lhld_lhd16();
-  void op_shld_d16hl();
+  void op_lhld();
+  void op_shld();
   void op_ldax();
   void op_stax_ma();
   void op_xchg();
+  void op_stax();
 
   // Arithmetic Group
   void op_inr();
@@ -50,8 +51,15 @@ public:
   void op_dcx();
   void op_dcr();
   void op_dad();
+  void op_add();
+  void op_adc();
   void op_ani();
   void op_adi();
+  void op_aci();
+  void op_sub();
+  void op_sui();
+  void op_sbi();
+  void op_sbb();
 
   // Branch Group
   void op_jmp();
@@ -68,6 +76,15 @@ public:
   void op_ana();
   void op_r_ccc();
   void op_ora();
+  void op_ori();
+  void op_xri();
+  void op_cmp();
+  void op_stc();
+  void op_cmc();
+  void op_cma();
+  void op_rlc();
+  void op_ral();
+  void op_rar();
 
   // Stack, I/O, Machine Group
   void op_push();
@@ -75,6 +92,7 @@ public:
   void op_out();
   void op_ei();
   void op_xthl();
+  void op_sphl();
 
 private:
   uint8_t a{};
