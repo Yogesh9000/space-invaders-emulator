@@ -54,6 +54,7 @@ Cpu::Cpu(Memory& memory)
   table[0x24] = &Cpu::op_inr;
   table[0x25] = &Cpu::op_dcr;
   table[0x26] = &Cpu::op_mvi;
+  table[0x27] = &Cpu::op_daa;
   table[0x28] = &Cpu::op_nop;
   table[0x29] = &Cpu::op_dad;
   table[0x2a] = &Cpu::op_lhld;
@@ -942,9 +943,19 @@ void Cpu::op_pop() {
 }
 
 void Cpu::op_out() {
+  uint16_t old_pc = pc;
   pc += 2;
   cycles_ = 10;
-  // TODO
+  uint8_t port = memory.read_d8(old_pc + 1);
+  switch (port) {
+    case 2:
+      shift_offset = a & 0x7;
+      break;
+    case 4:
+      shift0 = shift1;
+      shift1 = a;
+      break;
+  }
 }
 
 void Cpu::op_rrc() {
@@ -1975,12 +1986,103 @@ void Cpu::op_sphl() {
 }
 
 void Cpu::op_in() {
+  uint16_t old_pc = pc;
   pc += 2;
   cycles_ = 10;
-  // TODO
+  uint8_t port = memory.read_d8(old_pc + 1);
+  switch (port) {
+    case 0:
+      a = port_in0;
+      break;
+    case 1:
+      a = port_in1;
+      break;
+    case 2:
+      a = port_in2;
+      break;
+    case 3: {
+      uint16_t res = (shift1 << 8) | shift0;
+      a = ((res >> (8 - shift_offset)) & 0xff);
+    } break;
+  }
 }
 
 void Cpu::op_hlt() {
   cycles_ = 7;
   halted = true;
+}
+
+void Cpu::process_keydown(SDL_Keycode key) {
+  switch (key) {
+    case SDLK_c:  // insert coin
+      port_in1 |= 1;
+      break;
+    case SDLK_k:
+      port_in1 |= 1 << 1;
+      break;
+    case SDLK_s:  // P1 Start
+      port_in1 |= 1 << 2;
+      break;
+    case SDLK_w:  // P1 Shoot
+      port_in1 |= 1 << 4;
+      break;
+    case SDLK_a:  // P1 left
+      port_in1 |= 1 << 5;
+      break;
+    case SDLK_d:  // P1 right
+      port_in1 |= 1 << 6;
+      break;
+    case SDLK_LEFT:  // P2 left
+      port_in2 |= 1 << 5;
+      break;
+    case SDLK_RIGHT:  // P2 right
+      port_in2 |= 1 << 6;
+      break;
+    case SDLK_RETURN:  // P2 start
+      port_in2 |= 1 << 1;
+      break;
+    case SDLK_UP:  // P2 shoot
+      port_in2 |= 1 << 4;
+      break;
+  }
+}
+
+void Cpu::process_keyup(SDL_Keycode key) {
+  switch (key) {
+    case SDLK_c:  // insert coin
+      port_in1 &= ~1;
+      break;
+    case SDLK_k:
+      port_in1 &= ~(1 << 1);
+      break;
+    case SDLK_s:  // P1 Start
+      port_in1 &= ~(1 << 2);
+      break;
+    case SDLK_w:  // P1 Shoot
+      port_in1 &= ~(1 << 4);
+      break;
+    case SDLK_a:  // P1 left
+      port_in1 &= ~(1 << 5);
+      break;
+    case SDLK_d:  // P1 right
+      port_in1 &= ~(1 << 6);
+      break;
+    case SDLK_LEFT:  // P2 left
+      port_in2 &= ~(1 << 5);
+      break;
+    case SDLK_RIGHT:  // P2 right
+      port_in2 &= ~(1 << 6);
+      break;
+    case SDLK_RETURN:  // P2 start
+      port_in2 &= ~(1 << 1);
+      break;
+    case SDLK_UP:  // P2 shoot
+      port_in2 &= ~(1 << 4);
+      break;
+  }
+}
+
+void Cpu::op_daa() {
+  pc += 1;
+  cycles_ = 4;
 }

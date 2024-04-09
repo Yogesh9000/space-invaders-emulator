@@ -49,7 +49,13 @@ int main(int argc, char* argv[]) {
       cpu.generate_interrupt(0xcf);
       cpu_cycle(cpu, cycles_per_tic / 2);
       while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) quit = true;
+        if (e.type == SDL_QUIT) {
+          quit = true;
+        } else if (e.type == SDL_KEYDOWN) {
+          cpu.process_keydown(e.key.keysym.sym);
+        } else if (e.type == SDL_KEYUP) {
+          cpu.process_keyup(e.key.keysym.sym);
+        }
       }
       display.Update(memory.get() + VRAM_START);
       cpu.generate_interrupt(0xd7);

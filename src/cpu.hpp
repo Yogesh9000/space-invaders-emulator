@@ -1,6 +1,7 @@
 #ifndef CPU_HPP_INCLUDED
 #define CPU_HPP_INCLUDED
 
+#include "SDL2/SDL_keycode.h"
 #include "memory.hpp"
 
 constexpr int MEMORY_SIZE = 0xffff;
@@ -30,6 +31,8 @@ public:
   void generate_interrupt(uint8_t int_num);
   uint8_t get_cycles();
   bool is_halted();
+  void process_keydown(SDL_Keycode key);
+  void process_keyup(SDL_Keycode key);
 
   // OPCODES
   void op_nop();
@@ -62,6 +65,7 @@ public:
   void op_sui();
   void op_sbi();
   void op_sbb();
+  void op_daa();
 
   // Branch Group
   void op_jmp();
@@ -69,6 +73,7 @@ public:
   void op_call();
   void op_call_ccc();
   void op_ret();
+  void op_r_ccc();
   void op_pchl();
 
   // Logical Group
@@ -76,7 +81,6 @@ public:
   void op_rrc();
   void op_xra();
   void op_ana();
-  void op_r_ccc();
   void op_ora();
   void op_ori();
   void op_xri();
@@ -112,6 +116,13 @@ private:
   uint8_t cycles_{};
   bool int_enable{false};
   bool halted{false};
+  uint8_t port_in0{};
+  uint8_t port_in1{};
+  uint8_t port_in2{};
+  uint8_t port_in3{};
+  uint8_t shift0{};
+  uint8_t shift1{};
+  uint8_t shift_offset{};
   Memory& memory;
   std::unique_ptr<func[]> table{};
 };
