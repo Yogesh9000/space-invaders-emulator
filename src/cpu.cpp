@@ -10,7 +10,8 @@
 
 Cpu::Cpu(Memory& memory)
     : a{}, b{}, c{}, d{}, e{}, h{}, l{}, cc{}, pc{}, sp{}, cycles_{0},
-      memory{memory}, table{std::make_unique<func[]>(NUM_OPCODE + 1)} {
+      int_enable{false}, halted{false}, memory{memory},
+      table{std::make_unique<func[]>(NUM_OPCODE + 1)} {
   for (int i{0}; i <= 0xff; ++i) {
     table[i] = &Cpu::unimplemented_instruction;
   }
@@ -131,6 +132,7 @@ Cpu::Cpu(Memory& memory)
   table[0x73] = &Cpu::op_mov;
   table[0x74] = &Cpu::op_mov;
   table[0x75] = &Cpu::op_mov;
+  table[0x76] = &Cpu::op_hlt;
   table[0x77] = &Cpu::op_mov;
   table[0x78] = &Cpu::op_mov;
   table[0x79] = &Cpu::op_mov;
@@ -226,6 +228,7 @@ Cpu::Cpu(Memory& memory)
   table[0xd6] = &Cpu::op_sui;
   table[0xd8] = &Cpu::op_r_ccc;
   table[0xda] = &Cpu::op_jmp_ccc;
+  table[0xdb] = &Cpu::op_in;
   table[0xdc] = &Cpu::op_call_ccc;
   table[0xde] = &Cpu::op_sbi;
   table[0xe0] = &Cpu::op_r_ccc;
@@ -260,7 +263,9 @@ void Cpu::print_debug() {
   fmt::println("{}: {:x}, {}: {:x}, {}: {:x}", red("pc"), pc, red("pc - 100"),
                (pc - 0x100), red("sp"), sp);
 #else
-  fmt::println("{}: {:x}, {}: {:x}", red("pc"), pc, red("sp"), sp);
+  fmt::println("{}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}", red("pc"), pc,
+               red("sp"), sp, red("op"), memory[pc], red("sp[top]"),
+               memory.read_d16_32(sp));
 #endif  // DEBUG
   fmt::println(
       "{}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}",
@@ -1132,8 +1137,6 @@ void Cpu::op_ana() {
 void Cpu::generate_interrupt(uint8_t int_num) {
   if (!int_enable) return;
   int_enable = false;
-  uint16_t old_pc = pc;
-  pc += 1;
   memory[sp - 1] = (pc & 0xff00) >> 8;
   memory[sp - 2] = pc & 0xff;
   sp -= 2;
@@ -1142,6 +1145,10 @@ void Cpu::generate_interrupt(uint8_t int_num) {
 
 uint8_t Cpu::get_cycles() {
   return cycles_;
+}
+
+bool Cpu::is_halted() {
+  return halted;
 }
 
 void Cpu::op_r_ccc() {
@@ -1965,4 +1972,15 @@ void Cpu::op_sphl() {
   pc += 1;
   cycles_ = 5;
   sp = (h << 8) | l;
+}
+
+void Cpu::op_in() {
+  pc += 2;
+  cycles_ = 10;
+  // TODO
+}
+
+void Cpu::op_hlt() {
+  cycles_ = 7;
+  halted = true;
 }

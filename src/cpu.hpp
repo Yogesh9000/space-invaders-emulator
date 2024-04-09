@@ -29,6 +29,7 @@ public:
   void cycle();
   void generate_interrupt(uint8_t int_num);
   uint8_t get_cycles();
+  bool is_halted();
 
   // OPCODES
   void op_nop();
@@ -90,10 +91,12 @@ public:
   // Stack, I/O, Machine Group
   void op_push();
   void op_pop();
+  void op_in();
   void op_out();
   void op_ei();
   void op_xthl();
   void op_sphl();
+  void op_hlt();
 
 private:
   uint8_t a{};
@@ -108,6 +111,7 @@ private:
   uint16_t sp{};
   uint8_t cycles_{};
   bool int_enable{false};
+  bool halted{false};
   Memory& memory;
   std::unique_ptr<func[]> table{};
 };
