@@ -9,7 +9,8 @@
 #define green(arg) fmt::styled(arg, fmt::fg(fmt::color::green))
 
 Cpu::Cpu(Memory& memory)
-    : a{}, b{}, c{}, d{}, e{}, h{}, l{}, cc{}, pc{}, sp{}, memory{memory},
+    : a{}, b{}, c{}, d{}, e{}, h{}, l{}, cc{}, pc{}, sp{}, cycles_{0},
+      int_enable{false}, halted{false}, memory{memory},
       table{std::make_unique<func[]>(NUM_OPCODE + 1)} {
   for (int i{0}; i <= 0xff; ++i) {
     table[i] = &Cpu::unimplemented_instruction;
@@ -53,6 +54,7 @@ Cpu::Cpu(Memory& memory)
   table[0x24] = &Cpu::op_inr;
   table[0x25] = &Cpu::op_dcr;
   table[0x26] = &Cpu::op_mvi;
+  table[0x27] = &Cpu::op_daa;
   table[0x28] = &Cpu::op_nop;
   table[0x29] = &Cpu::op_dad;
   table[0x2a] = &Cpu::op_lhld;
@@ -131,6 +133,7 @@ Cpu::Cpu(Memory& memory)
   table[0x73] = &Cpu::op_mov;
   table[0x74] = &Cpu::op_mov;
   table[0x75] = &Cpu::op_mov;
+  table[0x76] = &Cpu::op_hlt;
   table[0x77] = &Cpu::op_mov;
   table[0x78] = &Cpu::op_mov;
   table[0x79] = &Cpu::op_mov;
@@ -226,6 +229,7 @@ Cpu::Cpu(Memory& memory)
   table[0xd6] = &Cpu::op_sui;
   table[0xd8] = &Cpu::op_r_ccc;
   table[0xda] = &Cpu::op_jmp_ccc;
+  table[0xdb] = &Cpu::op_in;
   table[0xdc] = &Cpu::op_call_ccc;
   table[0xde] = &Cpu::op_sbi;
   table[0xe0] = &Cpu::op_r_ccc;
@@ -260,7 +264,9 @@ void Cpu::print_debug() {
   fmt::println("{}: {:x}, {}: {:x}, {}: {:x}", red("pc"), pc, red("pc - 100"),
                (pc - 0x100), red("sp"), sp);
 #else
-  fmt::println("{}: {:x}, {}: {:x}", red("pc"), pc, red("sp"), sp);
+  fmt::println("{}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}", red("pc"), pc,
+               red("sp"), sp, red("op"), memory[pc], red("sp[top]"),
+               memory.read_d16_32(sp));
 #endif  // DEBUG
   fmt::println(
       "{}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}, {}: {:x}",
@@ -287,17 +293,20 @@ void Cpu::cycle() {
 
 void Cpu::op_nop() {
   pc += 1;
+  cycles_ = 4;
 }
 
 void Cpu::op_jmp() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 10;
   pc = memory.read_d16_32(old_pc + 1);
 }
 
 void Cpu::op_lxi() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 10;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -323,6 +332,7 @@ void Cpu::op_lxi() {
 void Cpu::op_mvi() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint8_t r = memory.read_d8(old_pc);
   r &= 0b00111000;
   r >>= 3;
@@ -347,6 +357,7 @@ void Cpu::op_mvi() {
       break;
     case 6u:
       memory[(h << 8) | l] = memory.read_d8(old_pc + 1);
+      cycles_ = 10;
       break;
     case 7u:
       a = memory.read_d8(old_pc + 1);
@@ -357,6 +368,7 @@ void Cpu::op_mvi() {
 void Cpu::op_call() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 17;
   memory[sp - 1] = (pc & 0xff00) >> 8;
   memory[sp - 2] = pc & 0xff;
   sp -= 2;
@@ -387,6 +399,7 @@ void Cpu::op_call() {
 void Cpu::op_ldax() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 7;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -403,6 +416,7 @@ void Cpu::op_ldax() {
 void Cpu::op_mov() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t r1 = memory.read_d8(old_pc);
   r1 &= 0b00111000;
   r1 >>= 3;
@@ -430,6 +444,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           b = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           b = a;
@@ -457,6 +472,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           c = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           c = a;
@@ -484,6 +500,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           d = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           d = a;
@@ -511,6 +528,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           e = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           e = a;
@@ -538,6 +556,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           h = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           h = a;
@@ -565,6 +584,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           l = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           l = a;
@@ -575,26 +595,34 @@ void Cpu::op_mov() {
       switch (r2) {
         case 0u:
           memory[(h << 8) | l] = b;
+          cycles_ = 7;
           break;
         case 1u:
           memory[(h << 8) | l] = c;
+          cycles_ = 7;
           break;
         case 2u:
           memory[(h << 8) | l] = d;
+          cycles_ = 7;
           break;
         case 3u:
           memory[(h << 8) | l] = e;
+          cycles_ = 7;
           break;
         case 4u:
           memory[(h << 8) | l] = h;
+          cycles_ = 7;
           break;
         case 5u:
           memory[(h << 8) | l] = l;
+          cycles_ = 7;
           break;
         case 6u:
+          cycles_ = 7;
           break;
         case 7u:
           memory[(h << 8) | l] = a;
+          cycles_ = 7;
           break;
       }
     } break;
@@ -620,6 +648,7 @@ void Cpu::op_mov() {
           break;
         case 6u:
           a = memory.read_d8((h << 8) | l);
+          cycles_ = 7;
           break;
         case 7u:
           break;
@@ -631,6 +660,7 @@ void Cpu::op_mov() {
 void Cpu::op_inx() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -664,6 +694,7 @@ void Cpu::op_inx() {
 void Cpu::op_dcr() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00111000;
   rp >>= 3;
@@ -709,6 +740,7 @@ void Cpu::op_dcr() {
       cc.z = (memory[(h << 8) | l] == 0);
       cc.s = (memory[(h << 8) | l] & 0x80) >> 7;
       cc.p = parity_iseven(memory[(h << 8) | l]);
+      cycles_ = 10;
       break;
     case 7:
       a -= 1;
@@ -722,6 +754,7 @@ void Cpu::op_dcr() {
 void Cpu::op_jmp_ccc() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 10;
   uint8_t ccc = memory.read_d8(old_pc);
   ccc &= 0b00111000;
   ccc >>= 3;
@@ -772,11 +805,13 @@ void Cpu::op_jmp_ccc() {
 void Cpu::op_ret() {
   pc = (memory.read_d8(sp + 1) << 8) | memory.read_d8(sp);
   sp += 2;
+  cycles_ = 10;
 }
 
 void Cpu::op_cpi() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint8_t byte2 = memory.read_d8(old_pc + 1);
   uint16_t res = static_cast<uint16_t>(a) - byte2;
   cc.z = ((res & 0xff) == 0);
@@ -788,6 +823,7 @@ void Cpu::op_cpi() {
 void Cpu::op_push() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 11;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -827,6 +863,7 @@ void Cpu::op_push() {
 void Cpu::op_dad() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 10;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -865,6 +902,7 @@ void Cpu::op_dad() {
 
 void Cpu::op_xchg() {
   pc += 1;
+  cycles_ = 5;
   std::swap(h, d);
   std::swap(l, e);
 }
@@ -872,6 +910,7 @@ void Cpu::op_xchg() {
 void Cpu::op_pop() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 10;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -904,12 +943,24 @@ void Cpu::op_pop() {
 }
 
 void Cpu::op_out() {
+  uint16_t old_pc = pc;
   pc += 2;
-  // TODO
+  cycles_ = 10;
+  uint8_t port = memory.read_d8(old_pc + 1);
+  switch (port) {
+    case 2:
+      shift_offset = a & 0x7;
+      break;
+    case 4:
+      shift0 = shift1;
+      shift1 = a;
+      break;
+  }
 }
 
 void Cpu::op_rrc() {
   pc += 1;
+  cycles_ = 4;
   cc.cy = a & 0x1;
   a >>= 1;
   a |= (cc.cy << 7);
@@ -918,6 +969,7 @@ void Cpu::op_rrc() {
 void Cpu::op_ani() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   a = a & memory.read_d8(old_pc + 1);
   cc.z = (a == 0);
   cc.s = ((a & 0x80) == 0x80);
@@ -929,6 +981,7 @@ void Cpu::op_ani() {
 void Cpu::op_adi() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint16_t res = static_cast<uint16_t>(a) + memory.read_d8(old_pc + 1);
   a = res & 0xff;
   cc.z = (a == 0);
@@ -940,6 +993,7 @@ void Cpu::op_adi() {
 void Cpu::op_lda() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 13;
   a = memory.read_d8((memory.read_d8(old_pc + 2) << 8) |
                      memory.read_d8(old_pc + 1));
 }
@@ -947,12 +1001,14 @@ void Cpu::op_lda() {
 void Cpu::op_sta() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 13;
   memory[(memory[old_pc + 2] << 8) | memory[old_pc + 1]] = a;
 }
 
 void Cpu::op_xra() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   switch (rp) {
@@ -1004,6 +1060,7 @@ void Cpu::op_xra() {
       cc.s = (a & 0x80) >> 7;
       cc.p = parity_iseven(a);
       cc.cy = 0;
+      cycles_ = 7;
       break;
     case 7:
       a = a ^ a;
@@ -1017,12 +1074,14 @@ void Cpu::op_xra() {
 
 void Cpu::op_ei() {
   pc += 1;
+  cycles_ = 4;
   int_enable = true;
 }
 
 void Cpu::op_ana() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t r = memory.read_d8(old_pc);
   r &= 0b00000111;
   switch (r) {
@@ -1074,6 +1133,7 @@ void Cpu::op_ana() {
       cc.s = (a & 0x80) >> 7;
       cc.p = parity_iseven(a);
       cc.cy = 0;
+      cycles_ = 7;
       break;
     case 7:
       a = a & a;
@@ -1087,17 +1147,25 @@ void Cpu::op_ana() {
 
 void Cpu::generate_interrupt(uint8_t int_num) {
   if (!int_enable) return;
-  uint16_t old_pc = pc;
-  pc += 1;
+  int_enable = false;
   memory[sp - 1] = (pc & 0xff00) >> 8;
   memory[sp - 2] = pc & 0xff;
   sp -= 2;
   pc = 8 * ((int_num & 0b00111000) >> 3);
 }
 
+uint8_t Cpu::get_cycles() {
+  return cycles_;
+}
+
+bool Cpu::is_halted() {
+  return halted;
+}
+
 void Cpu::op_r_ccc() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t ccc = memory.read_d8(old_pc);
   ccc &= 0b00111000;
   ccc >>= 3;
@@ -1148,6 +1216,7 @@ void Cpu::op_r_ccc() {
 void Cpu::op_ora() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t r = memory.read_d8(old_pc);
   r &= 0b00000111;
   switch (r) {
@@ -1199,6 +1268,7 @@ void Cpu::op_ora() {
       cc.s = (a & 0x80) >> 7;
       cc.p = parity_iseven(a);
       cc.cy = 0;
+      cycles_ = 7;
       break;
     case 7:
       a = a | a;
@@ -1212,18 +1282,21 @@ void Cpu::op_ora() {
 
 void Cpu::op_xthl() {
   pc += 1;
+  cycles_ = 18;
   std::swap(l, memory[sp]);
   std::swap(h, memory[sp + 1]);
 }
 
 void Cpu::op_pchl() {
   pc += 1;
+  cycles_ = 5;
   pc = (h << 8) | l;
 }
 
 void Cpu::op_dcx() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -1256,6 +1329,7 @@ void Cpu::op_dcx() {
 void Cpu::op_inr() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 5;
   uint8_t r = memory.read_d8(old_pc);
   r &= 0b00111000;
   r >>= 3;
@@ -1301,6 +1375,7 @@ void Cpu::op_inr() {
       cc.z = (memory[(h << 8) | l] == 0);
       cc.s = (memory[(h << 8) | l] & 0x80) >> 7;
       cc.p = parity_iseven(memory[(h << 8) | l]);
+      cycles_ = 10;
       break;
     case 7:
       ++a;
@@ -1314,12 +1389,14 @@ void Cpu::op_inr() {
 void Cpu::op_call_ccc() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 11;
   uint8_t ccc = memory.read_d8(old_pc);
   ccc &= 0b00111000;
   ccc >>= 3;
   switch (ccc) {
     case 0:
       if (cc.z == 0) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1328,6 +1405,7 @@ void Cpu::op_call_ccc() {
       break;
     case 1:
       if (cc.z == 1) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1336,6 +1414,7 @@ void Cpu::op_call_ccc() {
       break;
     case 2:
       if (cc.cy == 0) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1344,6 +1423,7 @@ void Cpu::op_call_ccc() {
       break;
     case 3:
       if (cc.cy == 1) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1352,6 +1432,7 @@ void Cpu::op_call_ccc() {
       break;
     case 4:
       if (cc.p == 0) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1360,6 +1441,7 @@ void Cpu::op_call_ccc() {
       break;
     case 5:
       if (cc.p == 1) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1368,6 +1450,7 @@ void Cpu::op_call_ccc() {
       break;
     case 6:
       if (cc.s == 0) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1376,6 +1459,7 @@ void Cpu::op_call_ccc() {
       break;
     case 7:
       if (cc.s == 1) {
+        cycles_ = 17;
         memory[sp - 1] = (pc & 0xff00) >> 8;
         memory[sp - 2] = pc & 0xff;
         sp -= 2;
@@ -1388,6 +1472,7 @@ void Cpu::op_call_ccc() {
 void Cpu::op_aci() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint16_t res = static_cast<uint16_t>(a) + memory.read_d8(old_pc + 1) + cc.cy;
   a = res & 0xff;
   cc.z = (a == 0);
@@ -1399,6 +1484,7 @@ void Cpu::op_aci() {
 void Cpu::op_sui() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint16_t res = static_cast<uint16_t>(a) - memory.read_d8(old_pc + 1);
   a = res & 0xff;
   cc.z = (a == 0);
@@ -1410,6 +1496,7 @@ void Cpu::op_sui() {
 void Cpu::op_sbi() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   uint16_t res = static_cast<uint16_t>(a) - memory.read_d8(old_pc + 1) - cc.cy;
   a = res & 0xff;
   cc.z = (a == 0);
@@ -1421,6 +1508,7 @@ void Cpu::op_sbi() {
 void Cpu::op_ori() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   a = a | memory.read_d8(old_pc + 1);
   cc.z = (a == 0);
   cc.s = ((a & 0x80) == 0x80);
@@ -1431,6 +1519,7 @@ void Cpu::op_ori() {
 void Cpu::op_xri() {
   uint16_t old_pc = pc;
   pc += 2;
+  cycles_ = 7;
   a = a ^ memory.read_d8(old_pc + 1);
   cc.z = (a == 0);
   cc.s = ((a & 0x80) == 0x80);
@@ -1441,6 +1530,7 @@ void Cpu::op_xri() {
 void Cpu::op_add() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   uint16_t res;
@@ -1500,6 +1590,7 @@ void Cpu::op_add() {
       cc.s = ((a & 0x80) == 0x80);
       cc.p = parity_iseven(a);
       cc.cy = (res > 0xff);
+      cycles_ = 7;
       break;
     case 7:
       res = a + a;
@@ -1515,6 +1606,7 @@ void Cpu::op_add() {
 void Cpu::op_sub() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   uint16_t res;
@@ -1574,6 +1666,7 @@ void Cpu::op_sub() {
       cc.s = ((a & 0x80) == 0x80);
       cc.p = parity_iseven(a);
       cc.cy = (res > 0xff);
+      cycles_ = 7;
       break;
     case 7:
       res = a - a;
@@ -1589,6 +1682,7 @@ void Cpu::op_sub() {
 void Cpu::op_adc() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   uint16_t res;
@@ -1648,6 +1742,7 @@ void Cpu::op_adc() {
       cc.s = ((a & 0x80) == 0x80);
       cc.p = parity_iseven(a);
       cc.cy = (res > 0xff);
+      cycles_ = 7;
       break;
     case 7:
       res = a + a + cc.cy;
@@ -1663,6 +1758,7 @@ void Cpu::op_adc() {
 void Cpu::op_sbb() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   uint16_t res;
@@ -1722,6 +1818,7 @@ void Cpu::op_sbb() {
       cc.s = ((a & 0x80) == 0x80);
       cc.p = parity_iseven(a);
       cc.cy = (res > 0xff);
+      cycles_ = 7;
       break;
     case 7:
       res = a - a - cc.cy;
@@ -1737,6 +1834,7 @@ void Cpu::op_sbb() {
 void Cpu::op_cmp() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 4;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00000111;
   uint16_t res;
@@ -1789,6 +1887,7 @@ void Cpu::op_cmp() {
       cc.s = ((res & 0x80) == 0x80);
       cc.p = parity_iseven(res & 0xff);
       cc.cy = (res > 0xff);
+      cycles_ = 7;
       break;
     case 7:
       res = a - a;
@@ -1803,6 +1902,7 @@ void Cpu::op_cmp() {
 void Cpu::op_lhld() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 16;
   l = memory.read_d8((memory.read_d8(old_pc + 2) << 8) |
                      memory.read_d8(old_pc + 1));
   h = memory.read_d8((memory.read_d8(old_pc + 2) << 8) |
@@ -1812,6 +1912,7 @@ void Cpu::op_lhld() {
 void Cpu::op_shld() {
   uint16_t old_pc = pc;
   pc += 3;
+  cycles_ = 16;
   memory[((memory.read_d8(old_pc + 2) << 8) | memory.read_d8(old_pc + 1))] = l;
   memory[((memory.read_d8(old_pc + 2) << 8) | memory.read_d8(old_pc + 1) + 1)] =
       h;
@@ -1820,6 +1921,7 @@ void Cpu::op_shld() {
 void Cpu::op_stax() {
   uint16_t old_pc = pc;
   pc += 1;
+  cycles_ = 7;
   uint8_t rp = memory.read_d8(old_pc);
   rp &= 0b00110000;
   rp >>= 4;
@@ -1835,21 +1937,25 @@ void Cpu::op_stax() {
 
 void Cpu::op_stc() {
   pc += 1;
+  cycles_ = 4;
   cc.cy = 1;
 }
 
 void Cpu::op_cmc() {
   pc += 1;
+  cycles_ = 4;
   cc.cy = cc.cy ? 0 : 1;
 }
 
 void Cpu::op_cma() {
   pc += 1;
+  cycles_ = 4;
   a = ~a;
 }
 
 void Cpu::op_rlc() {
   pc += 1;
+  cycles_ = 4;
   cc.cy = (a & 0x80) >> 7;
   a <<= 1;
   a |= cc.cy;
@@ -1857,6 +1963,7 @@ void Cpu::op_rlc() {
 
 void Cpu::op_ral() {
   pc += 1;
+  cycles_ = 4;
   uint8_t old_cy = cc.cy;
   cc.cy = (a & 0x80) >> 7;
   a <<= 1;
@@ -1865,6 +1972,7 @@ void Cpu::op_ral() {
 
 void Cpu::op_rar() {
   pc += 1;
+  cycles_ = 4;
   uint8_t old_cy = cc.cy;
   cc.cy = (a & 0x1);
   a >>= 1;
@@ -1873,5 +1981,108 @@ void Cpu::op_rar() {
 
 void Cpu::op_sphl() {
   pc += 1;
+  cycles_ = 5;
   sp = (h << 8) | l;
+}
+
+void Cpu::op_in() {
+  uint16_t old_pc = pc;
+  pc += 2;
+  cycles_ = 10;
+  uint8_t port = memory.read_d8(old_pc + 1);
+  switch (port) {
+    case 0:
+      a = port_in0;
+      break;
+    case 1:
+      a = port_in1;
+      break;
+    case 2:
+      a = port_in2;
+      break;
+    case 3: {
+      uint16_t res = (shift1 << 8) | shift0;
+      a = ((res >> (8 - shift_offset)) & 0xff);
+    } break;
+  }
+}
+
+void Cpu::op_hlt() {
+  cycles_ = 7;
+  halted = true;
+}
+
+void Cpu::process_keydown(SDL_Keycode key) {
+  switch (key) {
+    case SDLK_c:  // insert coin
+      port_in1 |= 1;
+      break;
+    case SDLK_k:
+      port_in1 |= 1 << 1;
+      break;
+    case SDLK_s:  // P1 Start
+      port_in1 |= 1 << 2;
+      break;
+    case SDLK_w:  // P1 Shoot
+      port_in1 |= 1 << 4;
+      break;
+    case SDLK_a:  // P1 left
+      port_in1 |= 1 << 5;
+      break;
+    case SDLK_d:  // P1 right
+      port_in1 |= 1 << 6;
+      break;
+    case SDLK_LEFT:  // P2 left
+      port_in2 |= 1 << 5;
+      break;
+    case SDLK_RIGHT:  // P2 right
+      port_in2 |= 1 << 6;
+      break;
+    case SDLK_RETURN:  // P2 start
+      port_in2 |= 1 << 1;
+      break;
+    case SDLK_UP:  // P2 shoot
+      port_in2 |= 1 << 4;
+      break;
+  }
+}
+
+void Cpu::process_keyup(SDL_Keycode key) {
+  switch (key) {
+    case SDLK_c:  // insert coin
+      port_in1 &= ~1;
+      break;
+    case SDLK_k:
+      port_in1 &= ~(1 << 1);
+      break;
+    case SDLK_s:  // P1 Start
+      port_in1 &= ~(1 << 2);
+      break;
+    case SDLK_w:  // P1 Shoot
+      port_in1 &= ~(1 << 4);
+      break;
+    case SDLK_a:  // P1 left
+      port_in1 &= ~(1 << 5);
+      break;
+    case SDLK_d:  // P1 right
+      port_in1 &= ~(1 << 6);
+      break;
+    case SDLK_LEFT:  // P2 left
+      port_in2 &= ~(1 << 5);
+      break;
+    case SDLK_RIGHT:  // P2 right
+      port_in2 &= ~(1 << 6);
+      break;
+    case SDLK_RETURN:  // P2 start
+      port_in2 &= ~(1 << 1);
+      break;
+    case SDLK_UP:  // P2 shoot
+      port_in2 &= ~(1 << 4);
+      break;
+  }
+}
+
+void Cpu::op_daa() {
+  pc += 1;
+  cycles_ = 4;
 }

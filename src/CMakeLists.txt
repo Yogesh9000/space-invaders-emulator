@@ -1,5 +1,5 @@
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-list(APPEND SOURCE_FILES "main.cpp" "cpu.cpp" "memory.cpp")
+list(APPEND SOURCE_FILES "main.cpp" "cpu.cpp" "memory.cpp" "display.cpp")
 
 add_executable(main ${SOURCE_FILES})
 
